@@ -1,0 +1,197 @@
+DATABASE:
+create table Authors(
+AuthorID int NOT NULL PRIMARY KEY,
+AuthorName varchar(100));
+
+create table Books(
+Title varchar(100),
+AuthorID int FOREIGN KEY REFERENCES Authors(AuthorID),
+ISBN varchar (30) NOT NULL,
+CopyNbr int NOT NULL,
+CONSTRAINT PK_Book PRIMARY KEY(ISBN, CopyNbr));
+
+create table Users(
+UserID varchar(10) NOT NULL PRIMARY KEY, --personnummer 10 siffror inget streck
+UserFirstName varchar(50),
+UserLastName varchar(50),
+UserDebt int DEFAULT 0,
+UserPassword varchar(25) NOT NULL,
+UserAdmin varchar(10) DEFAULT 'FALSE');
+
+create table Loans(
+BookISBN varchar(30),
+BookCopy int,
+UserID varchar(10),
+LoanDate date,
+ExpiryDate date,
+CONSTRAINT PK_Loan PRIMARY KEY (BookISBN,BookCopy,UserID),
+CONSTRAINT FK_LoanBook FOREIGN KEY (BookISBN, BookCopy) REFERENCES Books(ISBN, CopyNbr),
+CONSTRAINT FK_LoanUser FOREIGN KEY (UserID) REFERENCES Users(UserID));
+
+create table LoanHistory(
+timestamp datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+BookISBN varchar(30),
+BookCopy int,
+UserID varchar(10),
+LoanDate date,
+ExpiryDate date);
+
+TRIGGER:
+
+create trigger loanTrigger on Loans
+after update, insert
+as
+begin
+insert into LoanHistory(BookISBN, BookCopy, UserID, LoanDate, ExpiryDate)
+select i.BookISBN, i.BookCopy, i.UserID, i.LoanDate, i.ExpiryDate 
+from Loans l 
+inner join inserted i on l.BookISBN=i.BookISBN
+end
+
+
+STORED PROCEDURES:
+--changePassword
+create procedure changePassword @UserID varchar(10), @UserPassword varchar(25)
+as
+UPDATE Users SET UserPassword = @UserPassword WHERE UserID = @UserID
+
+
+--editUser
+create procedure editUser @UserFirstName varchar(50), @UserLastName varchar(50), @UserDebt int, 
+					      @UserPassword varchar(25), @UserAdmin varchar(10), @UserID varchar(10)
+as
+UPDATE Users SET UserFirstName = @UserFirstName, UserLastName = @UserLastName,
+                UserDebt = @UserDebt, UserPassword = @UserPassword, UserAdmin = @UserAdmin
+             WHERE UserID = @UserId
+
+
+--editAuthor
+create procedure editAuthor @AuthorName varchar(100), @AuthorID int
+as
+UPDATE Authors SET AuthorName = @Authorname WHERE AuthorID = @AuthorID
+
+
+--returnAuthorName
+create procedure returnAuthorName @AuthorID int
+as
+SELECT AuthorName FROM Authors WHERE AuthorID = @AuthorID
+
+--addNewLoan
+create procedure addNewLoan @BookISBN varchar(30),@BookCopy int, @UserID varchar(10), @LoanDate date, @ExpiryDate date
+as
+INSERT INTO Loans VALUES (@BookISBN, @BookCopy, @UserId, @LoanDate, @ExpiryDate)
+
+create procedure checkAvailability @BookISBN varchar(30),@BookCopy int
+
+as
+
+SELECT COUNT(BookISBN) AS nrLoans FROM Loans WHERE @BookISBN = bookISBN AND @BookCopy= bookCopy
+
+--userNbrOfLoans
+create procedure userNbrOfLoans @UserID varchar(30)
+
+as
+
+SELECT COUNT(@UserID) AS nrLoans FROM Loans WHERE @UserID = userID
+
+--authorNmbOfLoans
+create procedure authorNbrOfLoans @AuthorID int
+as
+SELECT COUNT(@AuthorID) AS nrBooks FROM Books WHERE @AuthorID = authorID
+
+--deleteUser
+create procedure deleteUser @UserID varchar(10)
+as
+DELETE FROM Users WHERE @UserID = userID
+
+--deleteAuthor
+create procedure deleteAuthor @AuthorID int
+as
+DELETE FROM Authors WHERE @AuthorID = authorID
+
+--deleteBook
+create procedure deleteBook @ISBN varchar(30), @CopyNbr int
+as
+DELETE FROM Books WHERE @ISBN = isbn AND @CopyNbr = copyNbr
+
+--getCopyNbr
+create procedure getCopyNbr @ISBN varchar(30)
+as
+SELECT COUNT(@ISBN) AS nrCopy FROM Books WHERE @ISBN =  isbn
+
+--getNextAuthorId
+create procedure getNextAuthorId
+as
+SELECT MAX(AuthorID) AS maxID FROM Authors 
+
+--addNewAuthor
+create procedure addNewAuthor @AuthorID int, @AuthorName varchar(100)
+as
+INSERT INTO Authors VALUES (@AuthorId, @AuthorName)
+
+--allLoans
+create procedure allLoans @BookISBN varchar(30), @ISBN varchar(30), @BookCopy int, @CopyNbr int
+as
+SELECT * FROM Loans, Books WHERE @BookISBN = @ISBN AND @BookCopy = @CopyNbr
+
+--allUsers
+create procedure allUsers
+as
+SELECT * FROM Users
+
+--allBooks
+create procedure allBooks
+as
+SELECT * FROM Books INNER JOIN Authors on Books.AuthorID = Authors.AuthorID LEFT JOIN Loans on Books.ISBN = Loans.BookISBN and Books.CopyNbr= Loans.BookCopy
+
+--allAuthors
+create procedure allAuthors
+as
+SELECT * FROM Authors
+
+--addNewBook
+create procedure addNewBook @Title varchar(100), @AuthorID int, @ISBN varchar(30), @CopyNbr int
+as
+INSERT INTO Books VALUES (@Title, @AuthorID, @ISBN, @CopyNbr)
+
+--addNewUser
+create procedure addNewUser @UserID varchar(10), @UserFirstName varchar(50), @UserLastName varchar(50), 
+			    @UserDebt int, @UserPassword varchar(25), @UserAdmin varchar(10) 
+as
+INSERT INTO Users VALUES (@UserID, @UserFirstName, @UserLastName, 
+			  @UserDebt, @UserPassword, @UserAdmin)
+
+--selectAuthor
+create procedure selectAuthor @searchAuthor varchar(100)
+as
+SELECT * FROM Books b INNER JOIN Authors a on b.AuthorID = a.AuthorID LEFT JOIN Loans l 
+on b.ISBN = l.BookISBN AND b.CopyNbr= l.BookCopy WHERE a.AuthorName = @searchAuthor
+
+--searchIsbn
+create procedure searchIsbn @searchIsbn varchar(100)
+as
+SELECT * FROM Books INNER JOIN Authors on Books.AuthorID = Authors.AuthorID LEFT JOIN Loans 
+on Books.ISBN = Loans.BookISBN AND Books.CopyNbr= Loans.BookCopy WHERE Books.ISBN = @searchIsbn
+
+--searchTitle
+create procedure searchTitle @searchTitle varchar(100)
+as
+SELECT * FROM Books INNER JOIN Authors on Books.AuthorID = Authors.AuthorID LEFT JOIN Loans 
+on Books.ISBN = Loans.BookISBN AND Books.CopyNbr= Loans.BookCopy WHERE Books.Title = @searchTitle
+
+--userID
+create procedure userID @UserID varchar(10)
+as
+SELECT * FROM USERS WHERE @UserID = userId
+
+--login
+create procedure login @UserID varchar(10), @UserPassword varchar(25)
+as
+SELECT * FROM USERS WHERE UserId= @UserID AND UserPassword = @UserPassword
+
+--addAuthor
+create procedure addAuthor @AuthorID int, @AuthorName varchar(100)
+as
+INSERT INTO Authors VALUES(@AuthorID, @AuthorName)
+
+
